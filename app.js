@@ -122,8 +122,14 @@ const playTone = (frequency, duration, type = "sine") => {
   oscillator.stop(now + duration);
 };
 
-const playAlert = () => {
-  playTone(880, 0.18, "triangle");
+const playPracticeStartSfx = () => {
+  playTone(740, 0.18, "triangle");
+  setTimeout(() => playTone(980, 0.18, "triangle"), 90);
+};
+
+const playRestStartSfx = () => {
+  playTone(520, 0.22, "sine");
+  setTimeout(() => playTone(390, 0.22, "sine"), 120);
 };
 
 const playStartSfx = () => {
@@ -139,6 +145,9 @@ const nextPhaseCycle = () => {
   currentPhase = currentPhase === "practice" ? "rest" : "practice";
   if (currentPhase === "practice") {
     cycleCount += 1;
+    playPracticeStartSfx();
+  } else {
+    playRestStartSfx();
   }
   remainingSeconds = getDuration(currentPhase);
   updateDisplay();
@@ -146,7 +155,6 @@ const nextPhaseCycle = () => {
 
 const tick = () => {
   if (remainingSeconds <= 0) {
-    playAlert();
     nextPhaseCycle();
     return;
   }
