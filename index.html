@@ -3,39 +3,46 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Loopable Interval Timer</title>
+		<title>Cycled Interval Timer</title>
 		<link rel="stylesheet" href="styles.css" />
 	</head>
 	<body>
 		<main class="container">
 			<header>
-				<h1>Loopable Interval Timer</h1>
+				<h1>Cycled Interval Timer</h1>
 				<p>Configure practice and rest timers, then press play to loop.</p>
 			</header>
 
-			<section class="grid">
-				<div class="card" aria-live="polite">
+			<section class="center-stack">
+				<div class="card timer-card" aria-live="polite">
 					<div class="phase">
 						<span class="badge" id="phaseBadge">Practice</span>
 						<span id="cycleInfo">Cycle 1</span>
 					</div>
 					<div class="timer-display" id="timerDisplay">00:00</div>
-					<div class="status">
+					<div class="controls">
+						<button class="primary" id="playButton">Play</button>
+						<button class="secondary" id="pauseButton" disabled>Pause</button>
+						<button class="danger" id="stopButton" disabled>Stop</button>
+					</div>
+					<div class="status" id="timerStatus">
 						<div><strong>Next:</strong> <span id="nextPhase">Rest</span></div>
 						<div><strong>Loop:</strong> <span id="loopStatus">Ready</span></div>
 					</div>
 				</div>
+			</section>
 
+			<section class="settings-grid">
 				<div class="card">
 					<h2>Practice Timer</h2>
 					<div class="inputs">
 						<label>
 							Minutes
-							<input id="practiceMinutes" type="number" min="0" max="99" value="1" />
+							<input class="small-input" id="practiceMinutes" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="03" />
 						</label>
 						<label>
 							Seconds
-							<input id="practiceSeconds" type="number" min="0" max="59" value="0" />
+							<input class="small-input" id="practiceSeconds" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="00" />
 						</label>
 					</div>
 				</div>
@@ -45,22 +52,17 @@
 					<div class="inputs">
 						<label>
 							Minutes
-							<input id="restMinutes" type="number" min="0" max="99" value="0" />
+							<input class="small-input" id="restMinutes" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="02" />
 						</label>
 						<label>
 							Seconds
-							<input id="restSeconds" type="number" min="0" max="59" value="30" />
+							<input class="small-input" id="restSeconds" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="00" />
 						</label>
 					</div>
 				</div>
 
 				<div class="card">
-					<h2>Controls</h2>
-					<div class="controls">
-						<button class="primary" id="playButton">Play</button>
-						<button class="secondary" id="pauseButton" disabled>Pause</button>
-						<button class="danger" id="stopButton" disabled>Stop</button>
-					</div>
+					<h2>Settings</h2>
 					<div class="volume-row">
 						<label for="volumeRange">Volume</label>
 						<input
@@ -68,18 +70,14 @@
 							type="range"
 							min="0"
 							max="100"
-							value="70"
+							value="25"
 						/>
-						<span id="volumeValue">70%</span>
+						<span id="volumeValue">50%</span>
 					</div>
-					<div class="status">
-						<div><strong>Practice Length:</strong> <span id="practiceSummary">01:00</span></div>
-						<div><strong>Rest Length:</strong> <span id="restSummary">00:30</span></div>
-					</div>
+						<!-- previews removed per user request -->
 				</div>
 			</section>
 
-			<div class="footer">Built for GitHub Pages — just push and enable Pages.</div>
 		</main>
 
 		<script src="app.js"></script>

@@ -8,8 +8,7 @@ const phaseBadge = document.getElementById("phaseBadge");
 const cycleInfo = document.getElementById("cycleInfo");
 const nextPhase = document.getElementById("nextPhase");
 const loopStatus = document.getElementById("loopStatus");
-const practiceSummary = document.getElementById("practiceSummary");
-const restSummary = document.getElementById("restSummary");
+// summary previews removed from UI; keep function as no-op
 
 const playButton = document.getElementById("playButton");
 const pauseButton = document.getElementById("pauseButton");
@@ -42,18 +41,17 @@ const formatTime = (totalSeconds) => {
 
 const getDuration = (phase) => {
   if (phase === "practice") {
-    const minutes = clampNumber(practiceMinutesInput.value, 0, 99);
+    const minutes = clampNumber(practiceMinutesInput.value, 0, 59);
     const seconds = clampNumber(practiceSecondsInput.value, 0, 59);
     return minutes * 60 + seconds;
   }
-  const minutes = clampNumber(restMinutesInput.value, 0, 99);
+  const minutes = clampNumber(restMinutesInput.value, 0, 59);
   const seconds = clampNumber(restSecondsInput.value, 0, 59);
   return minutes * 60 + seconds;
 };
 
 const updateSummaries = () => {
-  practiceSummary.textContent = formatTime(getDuration("practice"));
-  restSummary.textContent = formatTime(getDuration("rest"));
+  // previews removed; nothing to update here
 };
 
 const updateDisplay = () => {
@@ -110,7 +108,7 @@ const playTone = (frequency, duration, type = "sine") => {
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   const now = context.currentTime;
-  gain.gain.value = (clampNumber(volumeRange.value, 0, 100) / 100) * 0.6;
+  gain.gain.value = clampNumber(volumeRange.value, 0, 100) / 100;
   oscillator.type = type;
   oscillator.frequency.value = frequency;
   oscillator.connect(gain);
@@ -127,8 +125,9 @@ const playPracticeStartSfx = () => {
 };
 
 const playRestStartSfx = () => {
-  playTone(520, 0.22, "sine");
-  setTimeout(() => playTone(390, 0.22, "sine"), 120);
+  // Play the same two notes as practice but reversed
+  playTone(980, 0.18, "triangle");
+  setTimeout(() => playTone(740, 0.18, "triangle"), 90);
 };
 
 const playPhaseStartSfx = () => {
@@ -168,16 +167,23 @@ const startTimer = () => {
     return;
   }
   if (!isRunning) {
-    currentPhase = "practice";
-    cycleCount = 1;
-    remainingSeconds = practiceDuration || 1;
+    if (!isPaused) {
+      // fresh start: default to practice phase
+      currentPhase = "practice";
+      cycleCount = 1;
+      remainingSeconds = practiceDuration || 1;
+      // Play SFX only when starting fresh (not when resuming from pause)
+      playPhaseStartSfx();
+    } else {
+      // resuming from pause: preserve current phase and remaining time
+      remainingSeconds = remainingSeconds || getDuration(currentPhase) || 1;
+    }
   }
   clearInterval(intervalId);
   intervalId = setInterval(tick, 1000);
   isRunning = true;
   isPaused = false;
   loopStatus.textContent = "Running";
-  playPhaseStartSfx();
   updateDisplay();
   updateControls();
 };
@@ -196,9 +202,20 @@ const pauseTimer = () => {
 
 const handleInputChange = (event) => {
   const input = event.target;
+  // sanitize: keep digits only
+  let raw = String(input.value || "").replace(/\D+/g, "");
+  if (raw === "") {
+    raw = "0";
+  }
+  // limit to two digits
+  if (raw.length > 2) raw = raw.slice(-2);
+  let num = Number(raw);
+  if (Number.isNaN(num)) num = 0;
   const max = Number(input.max || 59);
   const min = Number(input.min || 0);
-  input.value = clampNumber(input.value, min, max);
+  num = Math.min(Math.max(num, min), max);
+  // always display two digits
+  input.value = String(num).padStart(2, "0");
   updateSummaries();
   if (!isRunning && !isPaused) {
     remainingSeconds = getDuration(currentPhase);
