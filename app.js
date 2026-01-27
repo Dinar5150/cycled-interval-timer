@@ -54,6 +54,36 @@ const updateSummaries = () => {
   // previews removed; nothing to update here
 };
 
+const getStartPhase = () => {
+  const practiceDuration = getDuration("practice");
+  const restDuration = getDuration("rest");
+  if (practiceDuration > 0) {
+    return { phase: "practice", duration: practiceDuration };
+  }
+  if (restDuration > 0) {
+    return { phase: "rest", duration: restDuration };
+  }
+  return null;
+};
+
+const getNextPhase = () => {
+  const practiceDuration = getDuration("practice");
+  const restDuration = getDuration("rest");
+  if (practiceDuration === 0 && restDuration === 0) {
+    return null;
+  }
+  if (currentPhase === "practice") {
+    if (restDuration > 0) {
+      return { phase: "rest", duration: restDuration, incrementCycle: false };
+    }
+    return { phase: "practice", duration: practiceDuration, incrementCycle: true };
+  }
+  if (practiceDuration > 0) {
+    return { phase: "practice", duration: practiceDuration, incrementCycle: true };
+  }
+  return { phase: "rest", duration: restDuration, incrementCycle: false };
+};
+
 const updateDisplay = () => {
   timerDisplay.textContent = formatTime(remainingSeconds);
   const next = currentPhase === "practice" ? "Rest" : "Practice";
@@ -74,10 +104,17 @@ const stopTimer = () => {
   intervalId = null;
   isRunning = false;
   isPaused = false;
-  currentPhase = "practice";
+  const startPhase = getStartPhase();
   cycleCount = 1;
-  remainingSeconds = getDuration("practice");
-  loopStatus.textContent = "Stopped";
+  if (startPhase) {
+    currentPhase = startPhase.phase;
+    remainingSeconds = startPhase.duration;
+    loopStatus.textContent = "Stopped";
+  } else {
+    currentPhase = "practice";
+    remainingSeconds = 0;
+    loopStatus.textContent = "Set a duration";
+  }
   updateDisplay();
   updateControls();
 };
@@ -139,14 +176,19 @@ const playPhaseStartSfx = () => {
 };
 
 const nextPhaseCycle = () => {
-  currentPhase = currentPhase === "practice" ? "rest" : "practice";
-  if (currentPhase === "practice") {
+  const next = getNextPhase();
+  if (!next) {
+    stopTimer();
+    return;
+  }
+  currentPhase = next.phase;
+  if (next.incrementCycle) {
     cycleCount += 1;
     playPracticeStartSfx();
   } else {
     playRestStartSfx();
   }
-  remainingSeconds = getDuration(currentPhase);
+  remainingSeconds = next.duration;
   updateDisplay();
 };
 
@@ -168,15 +210,32 @@ const startTimer = () => {
   }
   if (!isRunning) {
     if (!isPaused) {
-      // fresh start: default to practice phase
-      currentPhase = "practice";
+      // fresh start: start from the first non-zero phase
+      const startPhase = getStartPhase();
+      currentPhase = startPhase ? startPhase.phase : "practice";
       cycleCount = 1;
-      remainingSeconds = practiceDuration || 1;
+      remainingSeconds = startPhase ? startPhase.duration : 0;
       // Play SFX only when starting fresh (not when resuming from pause)
       playPhaseStartSfx();
     } else {
       // resuming from pause: preserve current phase and remaining time
-      remainingSeconds = remainingSeconds || getDuration(currentPhase) || 1;
+      if (remainingSeconds <= 0) {
+        const currentDuration = getDuration(currentPhase);
+        if (currentDuration > 0) {
+          remainingSeconds = currentDuration;
+        } else {
+          const next = getNextPhase();
+          if (!next) {
+            stopTimer();
+            return;
+          }
+          currentPhase = next.phase;
+          if (next.incrementCycle) {
+            cycleCount += 1;
+          }
+          remainingSeconds = next.duration;
+        }
+      }
     }
   }
   clearInterval(intervalId);
@@ -218,7 +277,14 @@ const handleInputChange = (event) => {
   input.value = String(num).padStart(2, "0");
   updateSummaries();
   if (!isRunning && !isPaused) {
-    remainingSeconds = getDuration(currentPhase);
+    const startPhase = getStartPhase();
+    if (startPhase) {
+      currentPhase = startPhase.phase;
+      remainingSeconds = startPhase.duration;
+    } else {
+      currentPhase = "practice";
+      remainingSeconds = 0;
+    }
     updateDisplay();
   }
 };
@@ -240,7 +306,14 @@ volumeRange.addEventListener("input", updateVolume);
 volumeRange.addEventListener("change", updateVolume);
 
 updateSummaries();
-remainingSeconds = getDuration("practice");
+const initialPhase = getStartPhase();
+if (initialPhase) {
+  currentPhase = initialPhase.phase;
+  remainingSeconds = initialPhase.duration;
+} else {
+  currentPhase = "practice";
+  remainingSeconds = 0;
+}
 updateDisplay();
 updateControls();
 updateVolume();
