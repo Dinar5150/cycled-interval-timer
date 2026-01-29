@@ -37,16 +37,18 @@ let metronomeAuto = false;
 let metronomeBeatIndex = 0;
 let metronomeLastBeatMs = null;
 let metronomeNextTickTime = null;
+let metronomeTempoBpm = clampNumber(metronomeTempoInput.value, 30, 300);
+let metronomeTempoDirty = false;
 const metronomeLookaheadMs = 25;
 const metronomeScheduleAheadTime = 0.12;
 
-const clampNumber = (value, min, max) => {
+function clampNumber(value, min, max) {
   const num = Number(value);
   if (Number.isNaN(num)) {
     return min;
   }
   return Math.min(Math.max(num, min), max);
-};
+}
 
 const PHASES = {
   PRACTICE: "practice",
@@ -194,7 +196,7 @@ const parseTimeSignature = () => {
   return { beats };
 };
 
-const getTempo = () => clampNumber(metronomeTempoInput.value, 30, 300);
+const getTempo = () => metronomeTempoBpm;
 
 const getMetronomeBeatMs = () => 60000 / getTempo();
 
@@ -281,15 +283,19 @@ const playTone = (frequency, duration, type = "sine", volume = 100, startTime = 
 
 const playPracticeStartSfx = () => {
   const volume = timerVolumeRange ? timerVolumeRange.value : 100;
-  playTone(740, 0.18, "triangle", volume);
-  setTimeout(() => playTone(980, 0.18, "triangle", volume), 90);
+  const context = getAudioContext();
+  const startAt = context.currentTime + 0.15;
+  playTone(740, 0.18, "triangle", volume, startAt);
+  playTone(980, 0.18, "triangle", volume, startAt + 0.09);
 };
 
 const playRestStartSfx = () => {
   // Play the same two notes as practice but reversed
   const volume = timerVolumeRange ? timerVolumeRange.value : 100;
-  playTone(980, 0.18, "triangle", volume);
-  setTimeout(() => playTone(740, 0.18, "triangle", volume), 90);
+  const context = getAudioContext();
+  const startAt = context.currentTime + 0.15;
+  playTone(980, 0.18, "triangle", volume, startAt);
+  playTone(740, 0.18, "triangle", volume, startAt + 0.09);
 };
 
 const playPhaseStartSfx = () => {
@@ -423,18 +429,37 @@ timerVolumeRange.addEventListener("change", updateTimerVolume);
 metronomeVolumeRange.addEventListener("input", updateMetronomeVolume);
 metronomeVolumeRange.addEventListener("change", updateMetronomeVolume);
 
-const handleTempoInput = () => {
-  const value = clampNumber(metronomeTempoInput.value, 30, 300);
-  metronomeTempoInput.value = value;
-  updateMetronomeState({ forceRestart: true });
+const markTempoDirty = () => {
+  metronomeTempoDirty = true;
+};
+
+const commitTempoIfChanged = () => {
+  if (!metronomeTempoDirty) {
+    return;
+  }
+  metronomeTempoDirty = false;
+
+  const raw = String(metronomeTempoInput.value ?? "").trim();
+  const parsed = Number(raw);
+  if (Number.isNaN(parsed)) {
+    metronomeTempoInput.value = String(metronomeTempoBpm);
+    return;
+  }
+  const nextTempo = clampNumber(parsed, 30, 300);
+  metronomeTempoInput.value = String(nextTempo);
+  if (nextTempo !== metronomeTempoBpm) {
+    metronomeTempoBpm = nextTempo;
+    updateMetronomeState({ forceRestart: true });
+  }
 };
 
 metronomeSignatureSelect.addEventListener("change", () => {
   updateMetronomeState({ forceRestart: true });
 });
 
-metronomeTempoInput.addEventListener("input", handleTempoInput);
-metronomeTempoInput.addEventListener("change", handleTempoInput);
+metronomeTempoInput.addEventListener("input", markTempoDirty);
+metronomeTempoInput.addEventListener("change", commitTempoIfChanged);
+metronomeTempoInput.addEventListener("blur", commitTempoIfChanged);
 
 metronomeToggleCheckbox.addEventListener("change", () => {
   metronomeEnabled = metronomeToggleCheckbox.checked;
