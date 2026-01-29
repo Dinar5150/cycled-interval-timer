@@ -1,1 +1,1 @@
-# loopable-interval-timer
+# metronome practice timer
