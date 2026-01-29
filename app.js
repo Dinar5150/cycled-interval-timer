@@ -39,6 +39,7 @@ let metronomeLastBeatMs = null;
 let metronomeNextTickTime = null;
 let metronomeTempoBpm = clampNumber(metronomeTempoInput.value, 30, 300);
 let metronomeTempoDirty = false;
+let metronomeRequestedStartTime = null;
 const metronomeLookaheadMs = 25;
 const metronomeScheduleAheadTime = 0.12;
 
@@ -145,22 +146,10 @@ const stopTimer = () => {
   isPaused = false;
   stopMetronome();
   currentPhase = PHASES.PRACTICE;
-  const currentDuration = getDuration(currentPhase);
-  if (currentDuration > 0) {
-    remainingSeconds = currentDuration;
-    loopStatus.textContent = "Stopped";
-  } else {
-    const startPhase = getStartPhase();
-    if (startPhase) {
-      currentPhase = startPhase.phase;
-      remainingSeconds = startPhase.duration;
-      loopStatus.textContent = "Stopped";
-    } else {
-      currentPhase = "practice";
-      remainingSeconds = 0;
-      loopStatus.textContent = "Set a duration";
-    }
-  }
+  const practiceDuration = getDuration(PHASES.PRACTICE);
+  const restDuration = getDuration(PHASES.REST);
+  remainingSeconds = practiceDuration;
+  loopStatus.textContent = (practiceDuration > 0 || restDuration > 0) ? "Stopped" : "Set a duration";
   updateDisplay();
   updateControls();
 };
@@ -230,7 +219,9 @@ const startMetronome = () => {
   const { beats } = parseTimeSignature();
   const beatSeconds = 60 / getTempo();
   metronomeLastBeatMs = beatSeconds * 1000;
-  metronomeNextTickTime = context.currentTime + 0.02;
+  const earliestStart = context.currentTime + 0.02;
+  metronomeNextTickTime = Math.max(earliestStart, metronomeRequestedStartTime ?? earliestStart);
+  metronomeRequestedStartTime = null;
   const scheduler = () => {
     if (!shouldMetronomeRun()) {
       stopMetronome();
@@ -285,6 +276,7 @@ const playPracticeStartSfx = () => {
   const volume = timerVolumeRange ? timerVolumeRange.value : 100;
   const context = getAudioContext();
   const startAt = context.currentTime + 0.15;
+  metronomeRequestedStartTime = startAt;
   playTone(740, 0.18, "triangle", volume, startAt);
   playTone(980, 0.18, "triangle", volume, startAt + 0.09);
 };
@@ -294,6 +286,7 @@ const playRestStartSfx = () => {
   const volume = timerVolumeRange ? timerVolumeRange.value : 100;
   const context = getAudioContext();
   const startAt = context.currentTime + 0.15;
+  metronomeRequestedStartTime = startAt;
   playTone(980, 0.18, "triangle", volume, startAt);
   playTone(740, 0.18, "triangle", volume, startAt + 0.09);
 };
