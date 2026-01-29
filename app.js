@@ -13,8 +13,14 @@ const loopStatus = document.getElementById("loopStatus");
 const playButton = document.getElementById("playButton");
 const pauseButton = document.getElementById("pauseButton");
 const stopButton = document.getElementById("stopButton");
-const volumeRange = document.getElementById("volumeRange");
-const volumeValue = document.getElementById("volumeValue");
+const timerVolumeRange = document.getElementById("timerVolumeRange");
+const timerVolumeValue = document.getElementById("timerVolumeValue");
+const metronomeSignatureSelect = document.getElementById("metronomeSignature");
+const metronomeTempoInput = document.getElementById("metronomeTempo");
+const metronomeVolumeRange = document.getElementById("metronomeVolumeRange");
+const metronomeVolumeValue = document.getElementById("metronomeVolumeValue");
+const metronomeToggleCheckbox = document.getElementById("metronomeToggle");
+const metronomeAutoToggleCheckbox = document.getElementById("metronomeAutoToggle");
 
 let intervalId = null;
 let isRunning = false;
@@ -24,6 +30,11 @@ let remainingSeconds = 0;
 let cycleCount = 1;
 let audioContext = null;
 let masterGain = null;
+let metronomeIntervalId = null;
+let metronomeEnabled = false;
+let metronomeAuto = false;
+let metronomeBeatIndex = 0;
+let metronomeLastBeatMs = null;
 
 const clampNumber = (value, min, max) => {
   const num = Number(value);
@@ -104,16 +115,22 @@ const stopTimer = () => {
   intervalId = null;
   isRunning = false;
   isPaused = false;
-  const startPhase = getStartPhase();
-  cycleCount = 1;
-  if (startPhase) {
-    currentPhase = startPhase.phase;
-    remainingSeconds = startPhase.duration;
+  stopMetronome();
+  const currentDuration = getDuration(currentPhase);
+  if (currentDuration > 0) {
+    remainingSeconds = currentDuration;
     loopStatus.textContent = "Stopped";
   } else {
-    currentPhase = "practice";
-    remainingSeconds = 0;
-    loopStatus.textContent = "Set a duration";
+    const startPhase = getStartPhase();
+    if (startPhase) {
+      currentPhase = startPhase.phase;
+      remainingSeconds = startPhase.duration;
+      loopStatus.textContent = "Stopped";
+    } else {
+      currentPhase = "practice";
+      remainingSeconds = 0;
+      loopStatus.textContent = "Set a duration";
+    }
   }
   updateDisplay();
   updateControls();
@@ -131,21 +148,91 @@ const getAudioContext = () => {
   return audioContext;
 };
 
-const updateVolume = () => {
-  const value = clampNumber(volumeRange.value, 0, 100);
-  volumeRange.value = value;
-  volumeValue.textContent = `${value}%`;
-  if (masterGain) {
-    masterGain.gain.value = value / 100;
+const updateTimerVolume = () => {
+  const value = clampNumber(timerVolumeRange.value, 0, 100);
+  timerVolumeRange.value = value;
+  timerVolumeValue.textContent = `${value}%`;
+};
+
+const updateMetronomeVolume = () => {
+  const value = clampNumber(metronomeVolumeRange.value, 0, 100);
+  metronomeVolumeRange.value = value;
+  metronomeVolumeValue.textContent = `${value}%`;
+};
+
+const parseTimeSignature = () => {
+  const value = String(metronomeSignatureSelect.value || "4/4");
+  const [beatsRaw, noteRaw] = value.split("/").map((part) => Number(part));
+  const beats = Number.isNaN(beatsRaw) ? 4 : beatsRaw;
+  const note = Number.isNaN(noteRaw) ? 4 : noteRaw;
+  return { beats, note };
+};
+
+const getTempo = () => clampNumber(metronomeTempoInput.value, 30, 300);
+
+const getMetronomeBeatMs = () => 60000 / getTempo();
+
+const playMetronomeClick = (accent) => {
+  const frequency = accent ? 1100 : 820;
+  const volume = metronomeVolumeRange ? metronomeVolumeRange.value : 100;
+  playTone(frequency, 0.06, accent ? "square" : "triangle", volume);
+};
+
+const stopMetronome = () => {
+  if (metronomeIntervalId) {
+    clearInterval(metronomeIntervalId);
+    metronomeIntervalId = null;
+  }
+  metronomeBeatIndex = 0;
+};
+
+const shouldMetronomeRun = () => {
+  if (!metronomeEnabled) return false;
+  if (metronomeAuto && currentPhase === "rest") return false;
+  return isRunning;
+};
+
+const startMetronome = () => {
+  stopMetronome();
+  if (!shouldMetronomeRun()) {
+    return;
+  }
+  const { beats } = parseTimeSignature();
+  const beatMs = getMetronomeBeatMs();
+  metronomeLastBeatMs = beatMs;
+  const playBeat = () => {
+    const beatInBar = metronomeBeatIndex % beats;
+    playMetronomeClick(beatInBar === 0);
+    metronomeBeatIndex += 1;
+  };
+  playBeat();
+  metronomeIntervalId = setInterval(playBeat, beatMs);
+};
+
+const updateMetronomeButtons = () => {
+  metronomeToggleCheckbox.checked = metronomeEnabled;
+  metronomeAutoToggleCheckbox.checked = metronomeAuto;
+};
+
+const updateMetronomeState = ({ forceRestart = false } = {}) => {
+  const beatMs = getMetronomeBeatMs();
+  const shouldRun = shouldMetronomeRun();
+  const tempoChanged = metronomeLastBeatMs !== null && Math.abs(metronomeLastBeatMs - beatMs) > 0.5;
+  if (!shouldRun) {
+    stopMetronome();
+    return;
+  }
+  if (forceRestart || tempoChanged || !metronomeIntervalId) {
+    startMetronome();
   }
 };
 
-const playTone = (frequency, duration, type = "sine") => {
+const playTone = (frequency, duration, type = "sine", volume = 100) => {
   const context = getAudioContext();
   const oscillator = context.createOscillator();
   const gain = context.createGain();
   const now = context.currentTime;
-  gain.gain.value = clampNumber(volumeRange.value, 0, 100) / 100;
+  gain.gain.value = clampNumber(volume, 0, 100) / 100;
   oscillator.type = type;
   oscillator.frequency.value = frequency;
   oscillator.connect(gain);
@@ -157,14 +244,16 @@ const playTone = (frequency, duration, type = "sine") => {
 };
 
 const playPracticeStartSfx = () => {
-  playTone(740, 0.18, "triangle");
-  setTimeout(() => playTone(980, 0.18, "triangle"), 90);
+  const volume = timerVolumeRange ? timerVolumeRange.value : 100;
+  playTone(740, 0.18, "triangle", volume);
+  setTimeout(() => playTone(980, 0.18, "triangle", volume), 90);
 };
 
 const playRestStartSfx = () => {
   // Play the same two notes as practice but reversed
-  playTone(980, 0.18, "triangle");
-  setTimeout(() => playTone(740, 0.18, "triangle"), 90);
+  const volume = timerVolumeRange ? timerVolumeRange.value : 100;
+  playTone(980, 0.18, "triangle", volume);
+  setTimeout(() => playTone(740, 0.18, "triangle", volume), 90);
 };
 
 const playPhaseStartSfx = () => {
@@ -190,6 +279,7 @@ const nextPhaseCycle = () => {
   }
   remainingSeconds = next.duration;
   updateDisplay();
+  updateMetronomeState({ forceRestart: true });
 };
 
 const tick = () => {
@@ -245,6 +335,7 @@ const startTimer = () => {
   loopStatus.textContent = "Running";
   updateDisplay();
   updateControls();
+  updateMetronomeState({ forceRestart: true });
 };
 
 const pauseTimer = () => {
@@ -257,6 +348,7 @@ const pauseTimer = () => {
   isPaused = true;
   loopStatus.textContent = "Paused";
   updateControls();
+  stopMetronome();
 };
 
 const handleInputChange = (event) => {
@@ -273,8 +365,7 @@ const handleInputChange = (event) => {
   const max = Number(input.max || 59);
   const min = Number(input.min || 0);
   num = Math.min(Math.max(num, min), max);
-  // always display two digits
-  input.value = String(num).padStart(2, "0");
+  input.value = String(num);
   updateSummaries();
   if (!isRunning && !isPaused) {
     const startPhase = getStartPhase();
@@ -302,8 +393,33 @@ const handleInputChange = (event) => {
 playButton.addEventListener("click", startTimer);
 pauseButton.addEventListener("click", pauseTimer);
 stopButton.addEventListener("click", stopTimer);
-volumeRange.addEventListener("input", updateVolume);
-volumeRange.addEventListener("change", updateVolume);
+timerVolumeRange.addEventListener("input", updateTimerVolume);
+timerVolumeRange.addEventListener("change", updateTimerVolume);
+metronomeVolumeRange.addEventListener("input", updateMetronomeVolume);
+metronomeVolumeRange.addEventListener("change", updateMetronomeVolume);
+
+const handleTempoInput = () => {
+  const value = clampNumber(metronomeTempoInput.value, 30, 300);
+  metronomeTempoInput.value = value;
+  updateMetronomeState({ forceRestart: true });
+};
+
+metronomeSignatureSelect.addEventListener("change", () => {
+  updateMetronomeState({ forceRestart: true });
+});
+
+metronomeTempoInput.addEventListener("input", handleTempoInput);
+metronomeTempoInput.addEventListener("change", handleTempoInput);
+
+metronomeToggleCheckbox.addEventListener("change", () => {
+  metronomeEnabled = metronomeToggleCheckbox.checked;
+  updateMetronomeState({ forceRestart: true });
+});
+
+metronomeAutoToggleCheckbox.addEventListener("change", () => {
+  metronomeAuto = metronomeAutoToggleCheckbox.checked;
+  updateMetronomeState({ forceRestart: true });
+});
 
 updateSummaries();
 const initialPhase = getStartPhase();
@@ -316,4 +432,6 @@ if (initialPhase) {
 }
 updateDisplay();
 updateControls();
-updateVolume();
+updateTimerVolume();
+updateMetronomeVolume();
+updateMetronomeButtons();

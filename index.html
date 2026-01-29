@@ -34,47 +34,98 @@
 
 			<section class="settings-grid">
 				<div class="card">
-					<h2>Practice Timer</h2>
-					<div class="inputs">
-						<label>
-							Minutes
-							<input class="small-input" id="practiceMinutes" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="03" />
-						</label>
-						<label>
-							Seconds
-							<input class="small-input" id="practiceSeconds" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="00" />
-						</label>
+					<h2>Timer Settings</h2>
+					<div class="timer-settings two-col">
+						<div class="timer-block">
+							<div class="block-title">Practice</div>
+							<div class="inputs compact">
+								<label>
+									Minutes
+									<input class="small-input" id="practiceMinutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="3" />
+								</label>
+								<label>
+									Seconds
+									<input class="small-input" id="practiceSeconds" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" />
+								</label>
+							</div>
+						</div>
+						<div class="timer-block">
+							<div class="block-title">Rest</div>
+							<div class="inputs compact">
+								<label>
+									Minutes
+									<input class="small-input" id="restMinutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="2" />
+								</label>
+								<label>
+									Seconds
+									<input class="small-input" id="restSeconds" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" />
+								</label>
+							</div>
+						</div>
 					</div>
-				</div>
-
-				<div class="card">
-					<h2>Rest Timer</h2>
-					<div class="inputs">
-						<label>
-							Minutes
-							<input class="small-input" id="restMinutes" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="02" />
-						</label>
-						<label>
-							Seconds
-							<input class="small-input" id="restSeconds" type="text" inputmode="numeric" pattern="[0-9]*" min="0" max="59" value="00" />
-						</label>
-					</div>
-				</div>
-
-				<div class="card">
-					<h2>Settings</h2>
 					<div class="volume-row">
-						<label for="volumeRange">Volume</label>
+						<label for="timerVolumeRange">Timer Volume</label>
 						<input
-							id="volumeRange"
+							id="timerVolumeRange"
 							type="range"
 							min="0"
 							max="100"
 							value="25"
 						/>
-						<span id="volumeValue">25%</span>
+						<span id="timerVolumeValue">25%</span>
 					</div>
-						<!-- previews removed per user request -->
+				</div>
+
+				<div class="card">
+					<h2>Metronome</h2>
+					<div class="metronome-grid">
+						<div class="toggle-row metronome-toggles">
+							<label class="checkbox-pill">
+								<input id="metronomeToggle" type="checkbox" />
+								<span>Enable</span>
+							</label>
+							<label class="checkbox-pill">
+								<input id="metronomeAutoToggle" type="checkbox" />
+								<span>Auto (rest off)</span>
+							</label>
+						</div>
+						<div class="metronome-row">
+							<label>
+								Time Signature
+								<select id="metronomeSignature">
+									<option value="1/4">1/4</option>
+									<option value="2/4">2/4</option>
+									<option value="3/4">3/4</option>
+									<option value="4/4" selected>4/4</option>
+									<option value="5/4">5/4</option>
+									<option value="6/4">6/4</option>
+									<option value="7/4">7/4</option>
+									<option value="1/8">1/8</option>
+									<option value="2/8">2/8</option>
+									<option value="3/8">3/8</option>
+									<option value="4/8">4/8</option>
+									<option value="5/8">5/8</option>
+									<option value="6/8">6/8</option>
+									<option value="7/8">7/8</option>
+								</select>
+							</label>
+							<label>
+								Tempo (BPM)
+								<input id="metronomeTempo" type="number" min="30" max="300" value="120" />
+							</label>
+						</div>
+						<div class="volume-row">
+							<label for="metronomeVolumeRange">Metro Volume</label>
+							<input
+								id="metronomeVolumeRange"
+								type="range"
+								min="0"
+								max="100"
+								value="35"
+							/>
+							<span id="metronomeVolumeValue">35%</span>
+						</div>
+					</div>
 				</div>
 			</section>
 
