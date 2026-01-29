@@ -8,6 +8,7 @@ const phaseBadge = document.getElementById("phaseBadge");
 const cycleInfo = document.getElementById("cycleInfo");
 const nextPhase = document.getElementById("nextPhase");
 const loopStatus = document.getElementById("loopStatus");
+const baseTitle = document.title;
 // summary previews removed from UI; keep function as no-op
 
 const playButton = document.getElementById("playButton");
@@ -30,11 +31,14 @@ let remainingSeconds = 0;
 let cycleCount = 1;
 let audioContext = null;
 let masterGain = null;
-let metronomeIntervalId = null;
+let metronomeSchedulerId = null;
 let metronomeEnabled = false;
 let metronomeAuto = false;
 let metronomeBeatIndex = 0;
 let metronomeLastBeatMs = null;
+let metronomeNextTickTime = null;
+const metronomeLookaheadMs = 25;
+const metronomeScheduleAheadTime = 0.12;
 
 const clampNumber = (value, min, max) => {
   const num = Number(value);
@@ -102,6 +106,11 @@ const updateDisplay = () => {
   phaseBadge.textContent = currentPhase === "practice" ? "Practice" : "Rest";
   phaseBadge.classList.toggle("rest", currentPhase === "rest");
   cycleInfo.textContent = `Cycle ${cycleCount}`;
+  if (isRunning) {
+    document.title = `${formatTime(remainingSeconds)} · ${phaseBadge.textContent}`;
+  } else {
+    document.title = baseTitle;
+  }
 };
 
 const updateControls = () => {
@@ -172,18 +181,19 @@ const getTempo = () => clampNumber(metronomeTempoInput.value, 30, 300);
 
 const getMetronomeBeatMs = () => 60000 / getTempo();
 
-const playMetronomeClick = (accent) => {
+const playMetronomeClick = (accent, startTime = null) => {
   const frequency = accent ? 1100 : 820;
   const volume = metronomeVolumeRange ? metronomeVolumeRange.value : 100;
-  playTone(frequency, 0.06, accent ? "square" : "triangle", volume);
+  playTone(frequency, 0.06, accent ? "square" : "triangle", volume, startTime);
 };
 
 const stopMetronome = () => {
-  if (metronomeIntervalId) {
-    clearInterval(metronomeIntervalId);
-    metronomeIntervalId = null;
+  if (metronomeSchedulerId) {
+    clearInterval(metronomeSchedulerId);
+    metronomeSchedulerId = null;
   }
   metronomeBeatIndex = 0;
+  metronomeNextTickTime = null;
 };
 
 const shouldMetronomeRun = () => {
@@ -197,16 +207,25 @@ const startMetronome = () => {
   if (!shouldMetronomeRun()) {
     return;
   }
+  const context = getAudioContext();
   const { beats } = parseTimeSignature();
-  const beatMs = getMetronomeBeatMs();
-  metronomeLastBeatMs = beatMs;
-  const playBeat = () => {
-    const beatInBar = metronomeBeatIndex % beats;
-    playMetronomeClick(beatInBar === 0);
-    metronomeBeatIndex += 1;
+  const beatSeconds = 60 / getTempo();
+  metronomeLastBeatMs = beatSeconds * 1000;
+  metronomeNextTickTime = context.currentTime + 0.02;
+  const scheduler = () => {
+    if (!shouldMetronomeRun()) {
+      stopMetronome();
+      return;
+    }
+    while (metronomeNextTickTime < context.currentTime + metronomeScheduleAheadTime) {
+      const beatInBar = metronomeBeatIndex % beats;
+      playMetronomeClick(beatInBar === 0, metronomeNextTickTime);
+      metronomeBeatIndex += 1;
+      metronomeNextTickTime += beatSeconds;
+    }
   };
-  playBeat();
-  metronomeIntervalId = setInterval(playBeat, beatMs);
+  scheduler();
+  metronomeSchedulerId = setInterval(scheduler, metronomeLookaheadMs);
 };
 
 const updateMetronomeButtons = () => {
@@ -222,16 +241,16 @@ const updateMetronomeState = ({ forceRestart = false } = {}) => {
     stopMetronome();
     return;
   }
-  if (forceRestart || tempoChanged || !metronomeIntervalId) {
+  if (forceRestart || tempoChanged || !metronomeSchedulerId) {
     startMetronome();
   }
 };
 
-const playTone = (frequency, duration, type = "sine", volume = 100) => {
+const playTone = (frequency, duration, type = "sine", volume = 100, startTime = null) => {
   const context = getAudioContext();
   const oscillator = context.createOscillator();
   const gain = context.createGain();
-  const now = context.currentTime;
+  const now = startTime ?? context.currentTime;
   gain.gain.value = clampNumber(volume, 0, 100) / 100;
   oscillator.type = type;
   oscillator.frequency.value = frequency;
